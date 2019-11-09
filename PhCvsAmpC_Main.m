@@ -2,30 +2,31 @@
 clear all
 clc
 % main directory
-path_main='Y:\mostame2\UIUC'; cd(path_main);
+path_main=''; cd(path_main);
 % Personal functions directory
-path_func='Y:\mostame2\UIUC\functions'; addpath(path_func);
+path_func=''; addpath(path_func);
 % Raw data directory
-path_root='Y:\mostame2\ECOGimport\'; addpath(path_root);
+path_root=''; addpath(path_root);
 % Fieldtrip directory
-addpath( 'Y:\mostame2\fieldtrip-20160912' );
+addpath( '' );
 ft_defaults;
 % results path
-path_results=['Y:\mostame2\UIUC' '\results\Task'];
+path_results='';
 
 %% ----------------------------------------------- Script
 for i_sub=[1:10]
     for freq=1:5
         clc; i_sub
         freq
-        Mainparham(path_main, path_root, path_results, freq,i_sub);
+        Main(path_main, path_root, path_results, freq,i_sub);
     end
 end
+
 %% ----------------------------------------------- Main function
-function []=Mainparham(path_main, path_root, path_results, freq,i_sub)
+function []=Main(path_main, path_root, path_results, freq,i_sub)
 Task='CRM'; trial_cond=1;
 [subject, edata, data_pre, cfg_markeddata, electrodes_coordinate]=load_clean_data(path_root,i_sub,Task,0);
-addpath(strcat('Y:\mostame2\ECOGimport\',subject)); load('BadElecs');
+addpath([path_root,'\',subject]); load('BadElecs');
 % Extract Data specifics
 numelec=numel(edata.label);
 numtrial=numel(edata.trial);
@@ -34,8 +35,8 @@ Tlim=[ edata.time{1}(1) edata.time{1}(end) ];
 Fs=edata.fsample;
 Time=linspace(Tlim(1), Tlim(2), size(edata.trial{1}, 2) );
 %% calculate electrode distance
+% read the excel file
 dist_electrodes=nan(numelec,numelec);
-addpath('Y:\mostame2\ECOGimport');
 fil=xlsread('MNI_Coordinates', subject);
 if size(fil,2)>3
     fil(:,1:2)=[];
@@ -122,12 +123,7 @@ FC_Amp_Zscored=FC_Amp;
 for i=1:numelec
     for j=1:numelec
         if i<j
-%             a=find( ~isnan(FC_Amp(i,j,:)),1,'first' ); b=find( ~isnan(FC_Amp(i,j,:)),1,'last' );
-%             temp=squeeze(FC_Amp(i,j,:))'; temp(isnan(temp))=[];
-%             [B,A]=cheby2(3,20,10/( 0.5/(cfg1.toi(2)-cfg1.toi(1)) )); temp1=filtfilt(B,A,temp); temp1=temp1/max(abs(temp1))*max(abs(temp));
-%             FC_Amp(i,j,a:b)=temp;
             FC_Amp_Zscored(i,j,:)=( FC_Amp(i,j,:)-nanmean(FC_Amp(i,j,cfg1.toi<0 & cfg1.toi>-0.5)) )/nanstd(FC_Amp(i,j,cfg1.toi<0 & cfg1.toi>-0.5));
-%             FC_Amp(j,i,:)=FC_Amp(i,j,:); 
             FC_Amp_Zscored(j,i,:)=FC_Amp_Zscored(i,j,:);
         end
     end
@@ -149,12 +145,7 @@ FC_PLV=temp; clear temp; FC_PLV_Zscored=FC_PLV;
 for i=1:numelec
     for j=1:numelec
         if i<j
-%             a=find( ~isnan(FC_PLV(i,j,:)),1,'first' ); b=find( ~isnan(FC_PLV(i,j,:)),1,'last' );
-%             temp=squeeze(FC_PLV(i,j,:))'; temp(isnan(temp))=[];
-%             [B,A]=cheby2(3,20,10/( 0.5/(cfg1.toi(2)-cfg1.toi(1)) )); temp1=filtfilt(B,A,temp); temp1=temp1/max(abs(temp1))*max(abs(temp));
-%             FC_PLV(i,j,a:b)=temp;
             FC_PLV_Zscored(i,j,:)=( FC_PLV(i,j,:)-nanmean(FC_PLV(i,j,cfg1.toi<0 & cfg1.toi>-0.5)) )/nanstd(FC_PLV(i,j,cfg1.toi<0 & cfg1.toi>-0.5));
-%             FC_PLV(j,i,:)=FC_PLV(i,j,:); 
             FC_PLV_Zscored(j,i,:)=FC_PLV_Zscored(i,j,:);
         end
     end
@@ -260,8 +251,6 @@ switch trial_cond % if 0, check what matrices are you using: Zscored or no!
         Tlim_cond=Tlim;
 end
 %% ----------------------------------------------- Generate null PDF of maximum correlations
-Max_Lag=0.5; %ms
-Max_Lag=Max_Lag/(Toi(2)-Toi(1));
 R=500;
 Max_corr_surr=nan(numelec,numelec,R); Zerolag_corr_surr=nan(numelec,numelec,R);
 lag_diff_nearest_surr=nan(numelec,numelec);
@@ -285,16 +274,6 @@ for i=1:numelec
                 %calculate correlation
                 [acorr, lag]=xcorr(temp1-nanmean(temp1), temp2-nanmean(temp2),'coeff');
                 Zerolag_corr_surr(i,j,repeat)=acorr(lag==0); Zerolag_corr_surr(j,i,repeat)=Zerolag_corr_surr(i,j,repeat);
-%                 % find out lag
-%                 a=round(Max_Lag); b=1+floor(length(lag)/2);
-%                 lag=lag(b-a:b+a); acorr=acorr(b-a:b+a);
-%                 dt_acorr=[diff(acorr) 0];
-%                 temp=[]; temp=dt_acorr.*circshift(dt_acorr,1); tmp=find(temp<0)-ceil(0.5*length(lag));
-%                 lag_diff_nearest_surr(i,j)=tmp( find(abs(tmp)==min(abs(tmp)),1,'first') );
-%                 lag_diff_nearest_surr(j,i)=lag_diff_nearest_surr(i,j);
-%                 % find out corresponding peak
-%                 Max_corr_surr(i,j,repeat)=acorr(lag==lag_diff_nearest_surr(i,j));
-%                 Max_corr_surr(j,i,repeat)=Max_corr_surr(i,j,repeat);
             end
         end
     end
@@ -304,7 +283,6 @@ close(h)
 %% ----------------------------------------------- estimate maximum correlations and lags
 % estimate correlations
 Max_corr=nan(numelec,numelec); Zerolag_corr=nan(numelec,numelec);
-lag_diff_nearest=nan(numelec,numelec);
 for i=1:numelec
     for j=1:numelec
         if i<j && Pair_significant(i,j)
@@ -312,41 +290,11 @@ for i=1:numelec
             temp1(isnan(temp1))=[]; temp2(isnan(temp2))=[];
             [acorr, lag]=xcorr(temp1-nanmean(temp1), temp2-nanmean(temp2),'coeff');
             Zerolag_corr(i,j)=acorr(lag==0); Zerolag_corr(j,i)=Zerolag_corr(i,j);
-%             % find out best lag
-%             a=round(Max_Lag); b=1+floor(length(lag)/2);
-%             lag=lag(b-a:b+a); acorr=acorr(b-a:b+a);
-%             dt_acorr=[diff(acorr) 0];
-%             temp=[]; temp=dt_acorr.*circshift(dt_acorr,1); tmp=find(temp<0)-ceil(0.5*length(lag));
-%             lag_diff_nearest(i,j)=tmp( find(abs(tmp)==min(abs(tmp)),1,'first') );
-%             lag_diff_nearest(j,i)=lag_diff_nearest(i,j);
-%             % find out corresponding peak
-%             Max_corr(i,j)=acorr(lag==lag_diff_nearest(i,j)); Max_corr(j,i)=Max_corr(i,j);
         end
     end
 end
-% --------------------------- test
 Max_corr=Zerolag_corr;
-% correct lag matrix
-% lag_diff_nearest=lag_diff_nearest.*(Toi(2)-Toi(1))*Fs; lag_diff_nearest(Pair_significant~=1)=nan;
-% filter large lags
-% Pair_significant(abs(lag_diff_nearest)>250)=0;
-% lag_diff_nearest(Pair_significant~=1)=nan;
 Max_corr(Pair_significant~=1)=nan; Zerolag_corr(Pair_significant~=1)=nan;
-%% fisher transformation
-% for i=1:size(Max_corr,1)
-%     for j=1:size(Max_corr,1)
-%         Max_corr_fisher(i,j)=0.5*log( (1+Max_corr(i,j))/(1-Max_corr(i,j)) );
-%         Max_corr_fisher(j,i)=Max_corr_fisher(i,j);
-%     end
-% end
-% for k=1:size(Zerolag_corr_surr,3)
-%     for i=1:size(Zerolag_corr_surr,1)
-%         for j=1:size(Zerolag_corr_surr,1)
-%             Max_corr_surr_fisher(i,j,k)=0.5*log( (1+Zerolag_corr_surr(i,j,k))/(1-Zerolag_corr_surr(i,j,k)) );
-%             Max_corr_surr_fisher(j,i,k)=Max_corr_surr_fisher(i,j,k);
-%         end
-%     end
-% end
 %% ----------------------------------------------- FDR control statistical test
 % MCP Hochberg FDR for positive values
 alpha=0.05;
@@ -411,15 +359,11 @@ for i=1:numelec
             temp=[];
             temp=squeeze(conn_PLV_Zscored_cont(i,j,:))'; temp=temp(~isnan(temp));
             [a w]=cpsd(temp,temp,[],[],1024); w=w/(2*pi);
-            % find right side FWHM
-            temp=[]; temp=abs((a-0.5*max(a))); temp(w<w(a==max(a)))=nan; temp=w( temp-nanmin(temp) == min( temp-nanmin(temp) ) );
-%             plot(w,a,'linewidth',2); line([temp temp],[0 a(w==temp)+2], 'color','k')
             A=[A w(a==max(a))];
-            B=[B temp];
         end
     end
 end
-W1=median(A); W1_FWHM=median(B);
+W1=median(A);
 % for AmpC
 A=[]; B=[];
 for i=1:numelec
@@ -428,15 +372,11 @@ for i=1:numelec
             temp=[];
             temp=squeeze(conn_Amp_Zscored_cont(i,j,:))'; temp=temp(~isnan(temp));
             [a w]=cpsd(temp,temp,[],[],1024); w=w/(2*pi);
-            % find right side FWHM
-            temp=[]; temp=abs((a-0.5*max(a))); temp(w<w(a==max(a)))=nan; temp=w( temp-nanmin(temp) == min( temp-nanmin(temp) ) );
-%             plot(w,a,'linewidth',2); line([temp temp],[0 a(w==temp)+2], 'color','k')
             A=[A w(a==max(a))];
-            B=[B temp];
         end
     end
 end
-W2=median(A); W2_FWHM=median(B);
+W2=median(A);
 Corr_step=round(1/min(W1, W2),1,'significant');
 if Corr_step>100
     fprintf('<<<<<<<<<<<<<<<WARNING! Corr_Step is longer than 100s = %d>>>>>>>>>>>>>>\n',Corr_step)
@@ -540,10 +480,6 @@ for i=1:size(Corr_alltime_significant_hochberg,3)
     temp=squeeze(Corr_alltime_significant_hochberg(:,:,i)); temp(Pair_significant==0)=nan;
     Corr_alltime_significant_hochberg(:,:,i)=temp;
 end
-
-%% ----------------------------------------------- extract correlation degrees
-corr_degree_pos=nanmean(Max_corr.*(Max_corr_significant_hochberg>0),2);
-corr_degree_neg=nanmean(Max_corr.*(Max_corr_significant_hochberg<0),2); corr_degree_neg=abs(corr_degree_neg);
 %% ----------------------------------------------- static connectivity
 % ------------ Baseline
 cfg=[]; cfg.toilim=[Tlim(1) 0];
